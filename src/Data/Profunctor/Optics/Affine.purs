@@ -2,12 +2,13 @@ module Data.Profunctor.Optics.Affine where
 
 import Prelude
 
+import Data.Bifunctor (lmap)
+import Data.Bifunctor as B
 import Data.Either (Either(..), either)
-import Data.Lens (_Right)
+import Data.Lens (Lens, _Right, set, view)
 import Data.Profunctor (class Profunctor, lcmap, rmap)
 import Data.Profunctor.Choice (class Choice)
 import Data.Profunctor.Strong (class Strong, first)
-import Data.Bifunctor (lmap)
 import Data.Tuple (Tuple(..), uncurry)
 
 type Affine s t a b = forall p. Strong p => Choice p => p a b -> p s t
@@ -75,3 +76,10 @@ ac2ap l =
 
 ap2ac :: forall s t a b. Affine s t a b -> Stall a b s t
 ap2ac l = l (Stall (const identity) Right)
+
+focusAffine :: forall f s t a b. (forall x y. Lens (f x) (f y) x y) -> Affine s t a b -> Affine (f s) t (f a) b
+focusAffine l a' = ac2ap (Stall put get)
+  where
+  a = ap2ac a'
+  get fs = B.rmap (flip (set l) fs) <<< tryView a <<< view l $ fs
+  put fs b = replaceIfPresent a (view l fs) b
