@@ -2,6 +2,8 @@ module Data.Profunctor.Optics where
 
 import Prelude
 
+import Control.Alt (class Alt)
+import Control.Alternative ((<|>))
 import Control.Monad.State (evalState, get, put)
 import Data.Array (zipWith)
 import Data.Bifoldable (bifoldMap)
@@ -9,16 +11,20 @@ import Data.Bifunctor (lmap, bimap)
 import Data.Either (Either(..), either)
 import Data.Filterable (class Filterable, filter)
 import Data.Foldable (class Foldable, and, length)
+import Data.FoldableWithIndex (foldMapWithIndex)
 import Data.Lens (Iso', Lens, Lens', first, left, lens, set, view)
 import Data.List (List(..), catMaybes)
 import Data.List as L
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Monoid.Alternate (Alternate(..))
+import Data.Newtype (un, unwrap)
 import Data.Profunctor (class Profunctor, dimap, lcmap, rmap)
 import Data.Profunctor.Choice (class Choice)
 import Data.Profunctor.Lazy (class Lazy2, defer2)
 import Data.Profunctor.Monoidal (class Monoidal, class MonoidalMono, class Semigroupal, class SemigroupalMono, zip, zipMono)
 import Data.Profunctor.Strong (class Strong)
 import Data.Traversable (class Traversable, traverse)
+import Data.TraversableWithIndex (class TraversableWithIndex, traverseWithIndex)
 import Data.Tuple (Tuple(..), fst, swap, uncurry)
 import Data.Witherable (class Witherable, wither)
 import Effect.Exception.Unsafe (unsafeThrow)
@@ -64,6 +70,7 @@ type LTraversal s t a b = { contents :: s -> L.List a, fill :: L.List b -> s -> 
 
 -- Profunctor traversals
 type PTraversal s t a b = forall p. Monoidal p => Lazy2 p => p a b -> p s t -- We need the lazy because recursing in purescript is dumb
+type PTraversal' s a = PTraversal s s a a
 
 -- Specialization of concrete traversals where t = s and b = a
 type LMonoTraversal s a = LTraversal s s a a
@@ -377,3 +384,20 @@ isDirty = lens view (flip update)
   view { modification } = isJust modification
   update true  { value, modification } = { value, modification: Just $ fromMaybe value modification }
   update false { value, modification } = { value, modification: Nothing }
+
+failing :: forall s t a b. PTraversal s t a b -> PTraversal s t a b -> PTraversal s t a b
+failing t1' t2' = lt2pt { contents, fill }
+  where
+  t1 = pt2lt t1'
+  t2 = pt2lt t2'
+  contents s = t1.contents s <|> t2.contents s
+  fill bs s = if L.null (t1.contents s) then t2.fill bs s else t1.fill bs s
+
+maybeToList Nothing = L.Nil
+maybeToList (Just a) = pure a
+
+ix :: forall i f a. TraversableWithIndex i f => Eq i => i -> PTraversal' (f a) a
+ix i = lt2pt { contents, fill }
+  where
+  contents = maybeToList <<< (\(Alternate x) -> x) <<< foldMapWithIndex \i' a -> Alternate $ if i == i' then Just a else Nothing
+  fill bs s = traverseWithIndex
