@@ -2,9 +2,8 @@ module Snap.SYTC.Component where
 
 import Control.Applicative (class Applicative)
 import Control.Apply (lift2) as A
-import Control.Bind ((<=<), (>=>))
+import Control.Bind (class Bind, (>=>))
 import Control.Category (class Category, class Semigroupoid, (<<<), (>>>))
-import Control.Monad (class Monad)
 import Data.Bifunctor (bimap)
 import Data.Either (Either(..), either)
 import Data.Functor.Compose (Compose(..))
@@ -12,6 +11,7 @@ import Data.Monoid.Endo (Endo(..))
 import Data.Newtype (un)
 import Data.Profunctor.Optics (flipEither)
 import Data.Tuple (Tuple(..), curry, fst, snd, swap, uncurry)
+import Debug.Trace (trace)
 import Prelude (Unit, unit, class Semigroup, class Monoid, (<>), ($), (>>=), flip, const, Void, absurd)
 import Prelude as P
 
@@ -76,7 +76,7 @@ zipMono c c' set v@(Tuple s s') = zip' set' v
   set' = set <<< bimap ((_ $ s) <<< runEndo) ((_ $ s') <<< runEndo)
 
 contraHoist :: forall v s u m n. (n Unit -> m Unit) -> Cmp m v s u -> Cmp n v s u
-contraHoist f cmp set s = cmp (f <<< set) s
+contraHoist f cmp set = cmp (f <<< set)
 
 pure :: forall m v s u. v -> Cmp m v s u
 pure v _ _ = v
@@ -120,6 +120,12 @@ composeFlipped :: forall m s u c x y z. Semigroupoid c => Cmp m (c x y) s u -> C
 composeFlipped = flip compose
 
 infixr 9 composeFlipped as >>>!
+
+handleM :: forall m v s u. Bind m => (u -> s -> m s) -> Cmp m v s u -> Cmp' m v s
+handleM f c set s = c (flip f s >=> set) s
+
+handleM_ :: forall m v s u. Bind m => (s -> m s) -> Cmp m v s u -> Cmp' m v s
+handleM_ f = handleM (const f)
 
 handle :: forall m v s u. (u -> s -> s) -> Cmp m v s u -> Cmp' m v s
 handle f c set s = c (flip f s >>> set) s

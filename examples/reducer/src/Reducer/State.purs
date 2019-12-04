@@ -2,17 +2,19 @@ module Examples.Reducer.State where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Effect.Aff (Milliseconds(..), delay, forkAff, Fiber, Aff)
+import Data.Maybe (Maybe(..))
+import Debug.Trace (trace)
+import Effect.Aff (Milliseconds(..), delay, Aff)
 
 data DelayerAction
-  = Load (DelayerAction -> Aff Unit)
+  = Loading
   | Loaded String
 
-data CounterAction
-  = Increment
-  | Decrement
+instance showDelayerAction :: Show DelayerAction
+  where
+  show Loading = "Loading"
+  show (Loaded s) = "(Loaded " <> show s <> ")"
 
 type State =
   { counter :: Int
@@ -20,26 +22,23 @@ type State =
   }
 
 initialState :: State
-initialState = 
+initialState =
   { counter: 0
   , delayer: Just "Click the button to launch a delayed request."
   }
 
--- TODO: Lenses and Variant
-rootReducer :: Either CounterAction DelayerAction -> State -> Aff State
-rootReducer act s = case act of
-  Left ca  -> pure $ s { counter = counterReducer ca s.counter }
-  Right da -> (\ds -> s { delayer = ds }) <$> delayerReducer da s.delayer
-
-counterReducer :: CounterAction -> Int -> Int
-counterReducer Increment x = x + 1
-counterReducer Decrement x = x - 1
+rootReducer :: Either Int DelayerAction -> State -> Aff State
+rootReducer act s =
+  trace "root reducer" $ \_ ->
+  trace (show s)       $ \_ ->
+  trace (show act)     $ \_ ->
+  case act of
+    Left i  -> pure $ s { counter = i }
+    Right da -> (s { delayer = _ }) <$> delayerReducer da s.delayer
 
 delayerReducer :: DelayerAction -> Maybe String -> Aff (Maybe String)
-delayerReducer (Load put) _ = do
-  _ <- affDelay 1000.0 $ put (Loaded "Delayed request completed.")
-  pure Nothing
 delayerReducer (Loaded s) _ = pure $ Just s
-
-affDelay :: forall a. Number -> Aff a -> Aff (Fiber a)
-affDelay t a = forkAff $ delay (Milliseconds t) *> a
+delayerReducer Loading _ = do
+  delay (Milliseconds 1000.0)
+  -- put (Loaded "Delayed request completed.")
+  pure Nothing

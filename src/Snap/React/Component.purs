@@ -11,15 +11,15 @@ import Data.Record.Append (class AppendRecord)
 import Data.Record.Append as RO
 import Data.Record.Extras as RE
 import Data.Symbol (class IsSymbol)
+import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Aff.Compat (EffectFn1)
 import Prim.Row (class Cons, class Lacks, class Union)
 import React.Basic (JSX) as R
-import React.Basic.DOM (button, div, img, input, text) as R
 import React.Basic.DOM (Props_button, Props_input, Props_img)
-import React.Basic.DOM.Events (key, targetChecked, targetValue) as R
+import React.Basic.DOM (button, div, img, input, text) as R
+import React.Basic.DOM.Events (capture, capture_, key, targetChecked, targetValue) as R
 import React.Basic.Events (EventFn, SyntheticEvent)
-import React.Basic.Events (handler, handler_) as R
 import Record as RD
 import Snap.Component ((#!), ($!))
 import Snap.SYTC.Component (Cmp, Cmp')
@@ -60,8 +60,8 @@ hovering :: forall s.
     s Boolean
 hovering set _ = flip RO.append { onMouseOver, onMouseLeave }
   where
-  onMouseOver  = R.handler_ $ set true
-  onMouseLeave = R.handler_ $ set false
+  onMouseOver  = R.capture_ $ set true
+  onMouseLeave = R.capture_ $ set false
 
 -- Emit unit values in response to click events on an element
 clicked :: forall s.
@@ -70,7 +70,7 @@ clicked :: forall s.
     s Unit
 clicked set _ = flip RO.append { onClick }
   where
-  onClick = R.handler_ $ set unit
+  onClick = R.capture_ $ set unit
 
 -- Graft a boolean state to whether a particular element is focused
 -- TODO: Make this properly settable (right now we just ignore s)
@@ -81,8 +81,8 @@ focused :: forall s.
     s Boolean
 focused set _ = flip RO.append { onFocus, onBlur }
   where
-  onFocus  = R.handler_ $ set true
-  onBlur   = R.handler_ $ set false
+  onFocus  = R.capture_ $ set true
+  onBlur   = R.capture_ $ set false
 
 -- An affordance for things that have some state that can be modified
 -- through some event
@@ -103,7 +103,7 @@ altered :: forall attr attr' k e.
   Affordance' attr' e
 altered k e set s ri =  RO.append ri (RO.append (RE.singleton k s) { onChange })
   where
-  onChange = R.handler e $ maybe (pure unit) set
+  onChange = R.capture e $ maybe (pure unit) set
 
 edited ::
   Affordance
@@ -130,7 +130,7 @@ keypressed :: forall s.
     s String
 keypressed set _ = flip RO.append { onKeyUp }
   where
-  onKeyUp = R.handler R.key $ maybe (pure unit) set
+  onKeyUp = R.capture R.key $ maybe (pure unit) set
 
 type Keypress = forall s.
   Affordance
